@@ -25,7 +25,7 @@
 1. Missing values: Dropped Cabin column, Guessed age based on  the meidan grouped from title, Filled Embarked with 's', Extracted title, standardized it and made new column for it.
 2. Duplicates: checked if any passenger have duplicates and drops them if found.
 3. Inconsistencies:  lowered Sex and Embarked for consistency.
-4. Outliers: detected 512 max in the Fare column, kept it as is even though it might skew results as the extreme fair might be due to other added amenities. 
+4. Outliers: detected 512 max in the Fare column, kept it as is even though it might skew results as the extreme fare might be due to other added amenities. 
 
 ## AI prompts used
 - Prompt 1: "In the names of the passengers there are multiple people with Mr. or Ms. Am i able to standardize it?"
@@ -152,6 +152,36 @@ print("Missing Age after:", df['Age'].isnull().sum())
 print("\nMedian Age by Title:")
 print(df.groupby('Title')['Age'].median())
 ```
+
+Prompt 3: Given the context of the data cleaning instructions given to me, it says here to include before and after of shape. What does it mean by shape?
+
+Generated: 
+In the context of data cleaning, **"shape"** refers to the **dimensions of your dataset**, specifically:
+
+- **Number of rows** (observations or records)  
+- **Number of columns** (variables or features)
+
+In Python (especially with pandas DataFrames), you can check the shape using the `.shape` attribute:
+
+```python
+df.shape
+# Returns a tuple like (1000, 5) meaning 1000 rows and 5 columns
+```
+
+So when your instructions say **"include before and after of shape,"** it means you should:
+
+1. **Before cleaning**: Report the shape of the original/raw dataset.  
+2. **After cleaning**: Report the shape of the dataset after you’ve applied your cleaning steps (e.g., removing duplicates, dropping missing values, filtering rows, etc.).
+
+**Example:**
+```python
+print("Shape before cleaning:", df.shape)
+# ... your cleaning steps ...
+print("Shape after cleaning:", df.shape)
+```
+
+This helps show how your cleaning process affected the size of the dataset—e.g., how many rows or columns were removed or added.
+
 
 ---
 
