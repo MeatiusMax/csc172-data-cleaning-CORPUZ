@@ -184,6 +184,231 @@ This helps show how your cleaning process affected the size of the dataset—e.g
 
 
 ---
+Prompt 3: can you debug this code for me and explain mistakes?
+
+
+import pandas as pd
+import numpy as np
+
+## 2. Load Dataset
+df = pd.read_csv("../data/raw_dataset.csv")
+df.head()
+
+## 3. Initial Exploration
+df.info()
+df.describe()
+
+#before cleaning
+#sample rows
+print(df.head())
+print("Shape before Cleaning",df.shape)
+
+## 4. Handle Missing Values
+# Example: fill numeric NaNs with median
+df['Embarked'] = df['Embarked'].fillna(df['Embarked'].mode())
+df.drop(columns=['Cabin'], inplace=True)
+
+#AI promted to do this part
+# Extract and standardize passenger titles
+df['Title'] = df['Name'].str.extract(r' ([A-Za-z]+)\.', expand=False)
+
+# Group rare titles
+df['Title'] = df['Title'].replace([
+    'Lady', 'Countess', 'Capt', 'Col', 'Don', 'Dr',
+    'Major', 'Rev', 'Sir', 'Jonkheer', 'Dona'], 'Rare')
+
+# Standardize female variants
+df['Title'] = df['Title'].replace(['Mlle', 'Ms'], 'Miss')
+df['Title'] = df['Title'].replace('Mme', 'Mrs')
+
+# Impute missing ages based on Title
+title_age_map = df.groupby('Title')['Age'].median().to_dict()
+
+df['Age'] = df['Age'].fillna(df['Title'].map(title_age_map))
+
+
+## 5. Remove Duplicates
+df = df.drop_duplicates()
+
+## 6. Standardize Formats
+# Example: string formatting
+df['Sex'] = df['Sex'].str.strip().str.lower()
+df['Embarked'] = df['Embarked'].str.strip().str.lower()
+
+## 7. Outlier Detection & Treatment
+# Example: IQR method
+Q1 = df['Fare'].quantile(0.25)
+Q3 = df['Fare'].quantile(0.75)
+IQR = Q3 - Q1
+filtered = df[~((df['Fare'] < (Q1 - 1.5 * IQR)) |(df['Fare'] > (Q3 + 1.5 * IQR)))]
+
+
+## 8. Save Cleaned Dataset
+filtered.to_csv("../data/cleaned_dataset.csv", index=False)
+#after cleaning
+#sample rows
+print(df.info())
+print(filtered.head())
+print("Shape after Cleaning",filtered.shape)
+df.describe()
+
+
+Generated: 
+Great! You've written a solid data-cleaning pipeline, but there are **several subtle bugs and logical issues** that could cause problems — especially around **missing value handling**, **inconsistent DataFrame usage**, and **data leakage**. Let’s go through them step by step.
+
+---
+
+### 🔴 **Critical Issue #1: You’re using `df` and `filtered` inconsistently**
+- You clean `df` (handle missing values, duplicates, standardize).
+- But for **outlier removal**, you create a **new DataFrame `filtered`**.
+- Then you **save `filtered`**, but **print diagnostics on both `df` and `filtered`** → this is confusing and inconsistent.
+
+✅ **Fix**: Either:
+- **Option A (Recommended)**: Apply all steps to **one DataFrame** (`df`), overwriting it each time.
+- **Option B**: Use `filtered` consistently after outlier step.
+
+👉 **Why it matters**: Your "after cleaning" snapshot should reflect the **exact data you saved** — which is `filtered`. But you never standardized `filtered['Sex']` or `filtered['Embarked']`! Those steps were applied only to `df`.
+
+---
+
+### 🔴 **Critical Issue #2: `fillna(df['Embarked'].mode())` is wrong**
+```python
+df['Embarked'] = df['Embarked'].fillna(df['Embarked'].mode())
+```
+- `df['Embarked'].mode()` returns a **Series**, not a scalar.
+- This will cause a **shape mismatch** or fill with `NaN`.
+
+✅ **Fix**:
+```python
+df['Embarked'] = df['Embarked'].fillna(df['Embarked'].mode()[0])
+```
+
+---
+
+### 🔴 **Issue #3: Outlier treatment drops rows, but you never update `df`**
+You do:
+```python
+filtered = df[~((df['Fare'] < ...) | ...)]
+```
+But then:
+- You **save `filtered`**
+- But later call `df.describe()` → this describes the **pre-outlier-removal** data!
+
+✅ **Fix**: Either:
+- Reassign: `df = df[...]` (and drop `filtered`)
+- Or use `filtered` everywhere after that point
+
+---
+
+### 🔴 **Issue #4: `df.head()` called twice unnecessarily**
+Not a bug, but redundant. You can remove the first `df.head()` after loading.
+
+---
+
+### 🔴 **Issue #5: No check for missing values before imputation**
+You assume `Age` and `Embarked` have missing values — which is fine for Titanic — but **good practice** is to check first (especially if dataset changes).
+
+Not critical, but worth noting.
+
+---
+
+### 🔴 **Issue #6: You never handle missing `Fare` (if any)**
+In Titanic, `Fare` has **1 missing value in the test set**, but usually **none in train**. However, if your `raw_dataset.csv` has missing `Fare`, the IQR step will fail or behave unexpectedly.
+
+But since you didn’t impute `Fare`, and then use it in IQR, you might get errors if `NaN` exists.
+
+✅ **Safer**: Impute `Fare` before outlier detection:
+```python
+df['Fare'] = df['Fare'].fillna(df['Fare'].median())
+```
+
+---
+
+### ✅ **Other Observations (Not Bugs, But Improvements)**
+- You drop `Cabin` early — good.
+- Title-based age imputation — excellent!
+- Standardizing `Sex` and `Embarked` to lowercase — fine, but ensure your model expects that (sometimes `'S'` vs `'s'` matters if merging later).
+
+---
+
+### ✅ **Corrected & Cleaned Code**
+
+```python
+import pandas as pd
+import numpy as np
+
+## 2. Load Dataset
+df = pd.read_csv("../data/raw_dataset.csv")
+
+## 3. Initial Exploration
+print("=== BEFORE CLEANING ===")
+print("Shape:", df.shape)
+print("\nMissing values:")
+print(df.isnull().sum())
+print("\nSample rows:")
+print(df.head())
+
+## 4. Handle Missing Values
+# Drop Cabin (too many missing)
+df.drop(columns=['Cabin'], inplace=True)
+
+# Fill Embarked with mode (most frequent)
+df['Embarked'] = df['Embarked'].fillna(df['Embarked'].mode()[0])
+
+# Fill Fare (in case of missing values)
+df['Fare'] = df['Fare'].fillna(df['Fare'].median())
+
+# Extract and standardize titles
+df['Title'] = df['Name'].str.extract(r' ([A-Za-z]+)\.', expand=False)
+df['Title'] = df['Title'].replace([
+    'Lady', 'Countess', 'Capt', 'Col', 'Don', 'Dr',
+    'Major', 'Rev', 'Sir', 'Jonkheer', 'Dona'], 'Rare')
+df['Title'] = df['Title'].replace(['Mlle', 'Ms'], 'Miss')
+df['Title'] = df['Title'].replace('Mme', 'Mrs')
+
+# Impute Age based on Title
+title_age_map = df.groupby('Title')['Age'].median().to_dict()
+df['Age'] = df['Age'].fillna(df['Title'].map(title_age_map))
+
+## 5. Remove Duplicates
+df = df.drop_duplicates()
+
+## 6. Standardize Formats
+df['Sex'] = df['Sex'].str.strip().str.lower()
+df['Embarked'] = df['Embarked'].str.strip().str.lower()
+
+## 7. Outlier Detection & Treatment (on Fare)
+Q1 = df['Fare'].quantile(0.25)
+Q3 = df['Fare'].quantile(0.75)
+IQR = Q3 - Q1
+df = df[~((df['Fare'] < (Q1 - 1.5 * IQR)) | (df['Fare'] > (Q3 + 1.5 * IQR)))]
+
+## 8. Save Cleaned Dataset
+df.to_csv("../data/cleaned_dataset.csv", index=False)
+
+## After Cleaning Snapshot
+print("\n=== AFTER CLEANING ===")
+print("Shape:", df.shape)
+print("\nMissing values:")
+print(df.isnull().sum())
+print("\nSample rows:")
+print(df.head())
+print("\nSummary stats:")
+print(df.describe())
+```
+
+---
+
+### ✅ Key Fixes Summary:
+| Issue | Fix |
+|------|-----|
+| Inconsistent `df` vs `filtered` | Use only `df` throughout |
+| `mode()` returns Series | Use `.mode()[0]` |
+| Outlier step doesn’t update `df` | Reassign `df = df[...]` |
+| No `Fare` imputation | Added median fill |
+| Unclear before/after snapshots | Added structured print statements |
+
+Now your pipeline is **consistent, correct, and reproducible**! 🎯
 
 ## Results
 - Rows before: PassengerId,Survived,Pclass,Name,Sex,Age,SibSp,Parch,Ticket,Fare,Cabin,Embarked
