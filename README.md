@@ -184,7 +184,7 @@ This helps show how your cleaning process affected the size of the dataset—e.g
 
 
 ---
-Prompt 3: can you debug this code for me and explain mistakes?
+Prompt 4: can you debug this code for me and explain mistakes?
 
 
 import pandas as pd
