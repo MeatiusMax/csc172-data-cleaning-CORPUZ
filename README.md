@@ -414,5 +414,5 @@ Now your pipeline is **consistent, correct, and reproducible**! 🎯
 - Rows before: PassengerId,Survived,Pclass,Name,Sex,Age,SibSp,Parch,Ticket,Fare,Cabin,Embarked
 - Rows after: PassengerId,Survived,Pclass,Name,Sex,Age,SibSp,Parch,Ticket,Fare,Embarked,Title
 
-Video: link
+Video: https://youtu.be/gAUKM-505Ls
         
